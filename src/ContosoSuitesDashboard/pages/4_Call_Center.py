@@ -8,7 +8,7 @@ import azure.cognitiveservices.speech as speechsdk
 from azure.ai.textanalytics import TextAnalyticsClient
 from azure.core.credentials import AzureKeyCredential
 from azure.ai.textanalytics import ExtractiveSummaryAction, AbstractiveSummaryAction
-from azure.cosmos import CosmosClient
+from azure.cosmos import CosmosClient, PartitionKey
 import openai
 
 
@@ -336,7 +336,15 @@ def make_azure_openai_embedding_request(text):
     """Create and return a new embedding request. Key assumptions:
     - Azure OpenAI endpoint, key, and deployment name stored in Streamlit secrets."""
 
-    return "This is a placeholder result. Fill in with real embedding."
+    aoai_endpoint = st.secrets["aoai"]["endpoint"]
+    aoai_key = st.secrets["aoai"]["key"]
+    aoai_deployment_name = st.secrets["aoai"]["embedding_deployment_name"]
+
+    client = openai.AzureOpenAI(
+        api_key=aoai_key, api_version="2024-06-01", azure_endpoint=aoai_endpoint
+    )
+
+    return client.embeddings.create(model=aoai_deployment_name, input=text)
 
 
 def normalize_text(s):
@@ -361,8 +369,9 @@ def generate_embeddings_for_call_contents(call_contents):
     # Normalize the text for tokenization
     # Call make_azure_openai_embedding_request() with the normalized content
     # Return the embeddings
+    normalized = normalize_text(call_contents)
 
-    return [0, 0, 0]
+    return make_azure_openai_embedding_request(normalized).data[0].embedding
 
 
 def save_transcript_to_cosmos_db(transcript_item):
@@ -379,6 +388,17 @@ def save_transcript_to_cosmos_db(transcript_item):
     # Create a CosmosClient
     # Load the Cosmos database and container
     # Insert the call transcript
+    cosmos_client = CosmosClient(cosmos_endpoint, cosmos_key)
+
+    # setup database for this sample
+    db = cosmos_client.create_database_if_not_exists(id=cosmos_database_name)
+    # setup container for this sample
+    container = db.create_container_if_not_exists(
+        id=cosmos_container_name,
+        partition_key=PartitionKey(path="/call_id", kind="Hash"),
+    )
+
+    container.create_item(body=transcript_item)
 
 
 ####################### HELPER FUNCTIONS FOR MAIN() #######################
