@@ -11,8 +11,16 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Microsoft.SemanticKernel.ChatCompletion;
+using Microsoft.Extensions.Logging;
+using Microsoft.ApplicationInsights.Extensibility;
+using Microsoft.ApplicationInsights.AspNetCore.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure logging
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddApplicationInsights();
 
 // Use the AppConfig.cs configuration class to build out the configuration
 var config = new ConfigurationBuilder()
@@ -62,6 +70,15 @@ builder.Services.AddSingleton<Kernel>((_) =>
     kernelBuilder.Plugins.AddFromType<DatabaseService>();
     return kernelBuilder.Build();
 });
+builder.Services.Configure<TelemetryConfiguration>(config =>
+{
+    config.SetAzureTokenCredential(new DefaultAzureCredential());
+});
+
+builder.Services.AddApplicationInsightsTelemetry(new ApplicationInsightsServiceOptions
+{
+    ConnectionString = builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]
+});
 
 var app = builder.Build();
 
@@ -74,45 +91,55 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+var logger = app.Services.GetRequiredService<ILogger<Program>>();
+
 /**** Endpoints ****/
 // This endpoint serves as the default landing page for the API.
-app.MapGet("/", async () => 
+app.MapGet("/", async () =>
 {
+    logger.LogInformation("Received request for the default landing page.");
     return "Welcome to the Contoso Suites Web API!";
 })
     .WithName("Index")
     .WithOpenApi();
 
 // Retrieve the set of hotels from the database.
-app.MapGet("/Hotels", async () => 
+app.MapGet("/Hotels", async () =>
 {
+    logger.LogInformation("Received request to retrieve hotels.");
     var hotels = await app.Services.GetRequiredService<IDatabaseService>().GetHotels();
+    logger.LogInformation("Retrieved {Count} hotels.", hotels.Count);
     return hotels;
 })
     .WithName("GetHotels")
     .WithOpenApi();
 
 // Retrieve the bookings for a specific hotel.
-app.MapGet("/Hotels/{hotelId}/Bookings/", async (int hotelId) => 
+app.MapGet("/Hotels/{hotelId}/Bookings/", async (int hotelId) =>
 {
+    logger.LogInformation("Received request to retrieve bookings for hotel ID {HotelId}.", hotelId);
     var bookings = await app.Services.GetRequiredService<IDatabaseService>().GetBookingsForHotel(hotelId);
+    logger.LogInformation("Retrieved {Count} bookings for hotel ID {HotelId}.", bookings.Count, hotelId);
     return bookings;
 })
     .WithName("GetBookingsForHotel")
     .WithOpenApi();
 
 // Retrieve the bookings for a specific hotel that are after a specified date.
-app.MapGet("/Hotels/{hotelId}/Bookings/{min_date}", async (int hotelId, DateTime min_date) => 
+app.MapGet("/Hotels/{hotelId}/Bookings/{min_date}", async (int hotelId, DateTime min_date) =>
 {
+    logger.LogInformation("Received request to retrieve bookings for hotel ID {HotelId} after {MinDate}.", hotelId, min_date);
     var bookings = await app.Services.GetRequiredService<IDatabaseService>().GetBookingsByHotelAndMinimumDate(hotelId, min_date);
+    logger.LogInformation("Retrieved {Count} bookings for hotel ID {HotelId} after {MinDate}.", bookings.Count, hotelId, min_date);
     return bookings;
 })
     .WithName("GetRecentBookingsForHotel")
     .WithOpenApi();
-    
+
 // This endpoint is used to send a message to the Azure OpenAI endpoint.
 app.MapPost("/Chat", async Task<string> (HttpRequest request) =>
 {
+    logger.LogInformation("Received request to chat with Azure OpenAI.");
     var message = await Task.FromResult(request.Form["message"]);
     var kernel = app.Services.GetRequiredService<Kernel>();
     var chatCompletionService = kernel.GetRequiredService<IChatCompletionService>();
@@ -121,6 +148,7 @@ app.MapPost("/Chat", async Task<string> (HttpRequest request) =>
         ToolCallBehavior = ToolCallBehavior.AutoInvokeKernelFunctions
     };
     var response = await chatCompletionService.GetChatMessageContentAsync(message.ToString(), executionSettings, kernel);
+    logger.LogInformation("Received response from Azure OpenAI.");
     return response?.Content!;
 })
     .WithName("Chat")
@@ -130,7 +158,9 @@ app.MapPost("/Chat", async Task<string> (HttpRequest request) =>
 // We will use this to generate embeddings for the maintenance request text.
 app.MapGet("/Vectorize", async (string text, [FromServices] IVectorizationService vectorizationService) =>
 {
+    logger.LogInformation("Received request to vectorize text.");
     var embeddings = await vectorizationService.GetEmbeddings(text);
+    logger.LogInformation("Generated embeddings for the provided text.");
     return embeddings;
 })
     .WithName("Vectorize")
@@ -139,16 +169,18 @@ app.MapGet("/Vectorize", async (string text, [FromServices] IVectorizationServic
 // This endpoint is used to search for maintenance requests based on a vectorized query.
 app.MapPost("/VectorSearch", async ([FromBody] float[] queryVector, [FromServices] IVectorizationService vectorizationService, int max_results = 0, double minimum_similarity_score = 0.8) =>
 {
-    // Exercise 3 Task 3 TODO #3: Insert code to call the ExecuteVectorSearch function on the Vectorization Service. Don't forget to remove the NotImplementedException.
+    logger.LogInformation("Received request to perform vector search.");
     var vectors = await vectorizationService.ExecuteVectorSearch(queryVector, max_results, minimum_similarity_score);
-    return vectors; 
+    logger.LogInformation("Performed vector search and retrieved {Count} results.", vectors.Count);
+    return vectors;
 })
     .WithName("VectorSearch")
     .WithOpenApi();
 
 // This endpoint is used to send a message to the Maintenance Copilot.
-app.MapPost("/MaintenanceCopilotChat", async ([FromBody]string message, [FromServices] MaintenanceCopilot copilot) =>
+app.MapPost("/MaintenanceCopilotChat", async ([FromBody] string message, [FromServices] MaintenanceCopilot copilot) =>
 {
+    logger.LogInformation("Received request to chat with Maintenance Copilot.");
     // Exercise 5 Task 2 TODO #10: Insert code to call the Chat function on the MaintenanceCopilot. Don't forget to remove the NotImplementedException.
     throw new NotImplementedException();
 })
