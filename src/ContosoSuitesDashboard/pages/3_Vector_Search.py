@@ -6,14 +6,14 @@ st.set_page_config(layout="wide")
 def handle_query_vectorization(query):
     """Vectorize the query using the Vectorize endpoint."""
     api_endpoint = st.secrets["api"]["endpoint"]
-    response = requests.get(f"{api_endpoint}/Vectorize", params={"text": query}, timeout=10, verify=False)
+    response = requests.get(f"{api_endpoint}/Vectorize", params={"text": query}, timeout=10, verify=True)
     return response.text
 
 def handle_vector_search(query_vector, max_results=5, minimum_similarity_score=0.8):
     """Perform a vector search using the VectorSearch endpoint."""
     api_endpoint = st.secrets["api"]["endpoint"]
     headers = {"Content-Type": "application/json"}
-    response = requests.post(f"{api_endpoint}/VectorSearch", data=query_vector, params={"max_results": max_results, "minimum_similarity_score": minimum_similarity_score}, headers=headers, timeout=10, verify=False)
+    response = requests.post(f"{api_endpoint}/VectorSearch", data=query_vector, params={"max_results": max_results, "minimum_similarity_score": minimum_similarity_score}, headers=headers, timeout=10, verify=True)
     return response
 
 def main():
@@ -47,12 +47,20 @@ def main():
     if st.button("Submit"):
         with st.spinner("Performing vector search..."):
             if query:
+                print(f"Query: {query}")
+
                 # Vectorize the query text.
                 vectors = handle_query_vectorization(query)
+
+                print(f"Vectors: {vectors}")
+                print(f"Max results: {max_results}")
+                print(f"Minimum similarity score: {minimum_similarity_score}")
                 
                 # Perform the vector search.
                  
                 results = handle_vector_search(vectors, max_results, minimum_similarity_score)
+
+                print(f"Results: {results}")
                 
                 # Display the results.
                 st.write("## Results")
