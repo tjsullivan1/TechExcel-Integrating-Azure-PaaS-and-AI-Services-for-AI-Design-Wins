@@ -108,7 +108,7 @@ app.MapGet("/Hotels", async () =>
 {
     logger.LogInformation("Received request to retrieve hotels.");
     var hotels = await app.Services.GetRequiredService<IDatabaseService>().GetHotels();
-    logger.LogInformation("Retrieved {Count} hotels.", hotels.Count);
+    logger.LogInformation("Retrieved hotels.");
     return hotels;
 })
     .WithName("GetHotels")
@@ -117,9 +117,9 @@ app.MapGet("/Hotels", async () =>
 // Retrieve the bookings for a specific hotel.
 app.MapGet("/Hotels/{hotelId}/Bookings/", async (int hotelId) =>
 {
-    logger.LogInformation("Received request to retrieve bookings for hotel ID {HotelId}.", hotelId);
+    logger.LogInformation($"Received request to retrieve bookings for hotel ID {hotelId}.");
     var bookings = await app.Services.GetRequiredService<IDatabaseService>().GetBookingsForHotel(hotelId);
-    logger.LogInformation("Retrieved {Count} bookings for hotel ID {HotelId}.", bookings.Count, hotelId);
+    logger.LogInformation($"Retrieved bookings for hotel ID {hotelId}.");
     return bookings;
 })
     .WithName("GetBookingsForHotel")
@@ -130,7 +130,7 @@ app.MapGet("/Hotels/{hotelId}/Bookings/{min_date}", async (int hotelId, DateTime
 {
     logger.LogInformation("Received request to retrieve bookings for hotel ID {HotelId} after {MinDate}.", hotelId, min_date);
     var bookings = await app.Services.GetRequiredService<IDatabaseService>().GetBookingsByHotelAndMinimumDate(hotelId, min_date);
-    logger.LogInformation("Retrieved {Count} bookings for hotel ID {HotelId} after {MinDate}.", bookings.Count, hotelId, min_date);
+    logger.LogInformation($"Retrieved bookings for hotel ID {hotelId}.");
     return bookings;
 })
     .WithName("GetRecentBookingsForHotel")
