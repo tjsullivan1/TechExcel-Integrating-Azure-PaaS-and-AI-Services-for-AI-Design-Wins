@@ -12,7 +12,12 @@ namespace ContosoSuitesWebAPI.Agents
     {
         // Exercise 5 Task 2 TODO #3: Uncomment the two lines below to declare the Kernel and ChatHistory objects.
         public readonly Kernel _kernel = kernel;
-        private ChatHistory _history = new();
+        private ChatHistory _history = new("""
+            You are a helpful maintenance copilot. You intake requests from luxury hotel guests for the hotel maintenance team.
+            You should ensure you have all the necessary information to assist with maintenance requests.
+            You should ensure you have permission to perform additional actions, such as saving the request to the database.
+            You should inform the user that you have saved the requet and maintenance will address them shortly.
+            """);
 
         /// <summary>
         /// Chat with the maintenance copilot.
