@@ -1,9 +1,10 @@
 ﻿using ContosoSuitesWebAPI.Entities;
 using Microsoft.Azure.Cosmos;
+using System.Globalization;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Embeddings;
-using System.Globalization;
 
+#pragma warning disable SKEXP0001 
 namespace ContosoSuitesWebAPI.Services
 {
     /// <summary>
@@ -13,20 +14,23 @@ namespace ContosoSuitesWebAPI.Services
     {
         private readonly Kernel _kernel = kernel;
         private readonly CosmosClient _cosmosClient = cosmosClient;
+        private readonly string _embeddingDeploymentName = configuration.GetValue<string>("AzureOpenAI:EmbeddingDeploymentName") ?? "text-embedding-ada-002";
 
         /// <summary>
         /// Translate a text string into a vector embedding.
         /// This uses the embedding deployment name in your configuration, or defaults to text-embedding-ada-002.
         /// </summary>
-        public async Task<float[]> GetEmbeddings(List<string> text)
+        public async Task<float[]> GetEmbeddings(string text)
         {
+
             try
             {
                 // Generate a vector for the provided text.
-#pragma warning disable SKEXP0001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
-                var embeddings = await _kernel.GetRequiredService<ITextEmbeddingGenerationService>().GenerateEmbeddingsAsync(text);
-#pragma warning restore SKEXP0001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
-                var vector = embeddings.First().ToArray();
+                // Generate a vector for the provided text.
+                var embeddings = await _kernel.GetRequiredService<ITextEmbeddingGenerationService>().GenerateEmbeddingAsync(text);
+
+
+                var vector = embeddings.ToArray();
 
                 // Return the vector embeddings.
                 return vector;
