@@ -26,9 +26,9 @@ namespace ContosoSuitesWebAPI.Services
             {
                 // Generate a vector for the provided text.
 #pragma warning disable SKEXP0001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
-                var embeddings = await _kernel.GetRequiredService<ITextEmbeddingGenerationService>().GenerateEmbeddingsAsync(new List<string> { text });
+                var embeddings = await _kernel.GetRequiredService<ITextEmbeddingGenerationService>().GenerateEmbeddingsAsync(text);
 #pragma warning restore SKEXP0001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
-                var vector = embeddings.First().ToArray();
+                var vector = embeddings.ToArray();
 
                 // Return the vector embeddings.
                 return vector;
