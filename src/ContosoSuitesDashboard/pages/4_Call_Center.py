@@ -155,7 +155,32 @@ def generate_extractive_summary(call_contents):
     # Join them together with spaces to pass in as a single document.
     joined_call_contents = " ".join(call_contents)
 
-    return "This is a placeholder result. Fill in with real extractive summary."
+    text_analytics_client = TextAnalyticsClient(
+        endpoint=language_endpoint,
+        credential=AzureKeyCredential(language_key),
+    )
+
+    # Call the begin_analyze_actions method on your client, passing in the joined
+    # call_contents as an array and an ExtractiveSummaryAction with a max_sentence_countof 2.
+    poller = text_analytics_client.begin_analyze_actions(
+        [joined_call_contents], actions=[ExtractiveSummaryAction(max_sentence_count=2)]
+    )
+
+    # Extract the summary sentences and merge them into a single summary string.
+    for result in poller.result():
+        summary_result = result[0]
+        if summary_result.is_error:
+            st.error(
+                f'Extractive summary resulted in an error with code "{summary_result.code}" and message "{summary_result.message}"'
+            )
+            return ""
+
+        extractive_summary = " ".join(
+            [sentence.text for sentence in summary_result.sentences]
+        )
+
+    # Return the summary as a JSON object in the shape '{"call-summary":extractive_summary}'
+    return json.loads('{"call-summary":"' + extractive_summary + '"}')
 
 
 @st.cache_data
@@ -171,7 +196,32 @@ def generate_abstractive_summary(call_contents):
     # Join them together with spaces to pass in as a single document.
     joined_call_contents = " ".join(call_contents)
 
-    return "This is a placeholder result. Fill in with real abstractive summary."
+    text_analytics_client = TextAnalyticsClient(
+        endpoint=language_endpoint,
+        credential=AzureKeyCredential(language_key),
+    )
+
+    # Call the begin_analyze_actions method on your client, passing in the joined
+    # call_contents as an array and an ExtractiveSummaryAction with a max_sentence_countof 2.
+    poller = text_analytics_client.begin_analyze_actions(
+        [joined_call_contents], actions=[AbstractiveSummaryAction(max_sentence_count=2)]
+    )
+
+    # Extract the summary sentences and merge them into a single summary string.
+    for result in poller.result():
+        summary_result = result[0]
+        if summary_result.is_error:
+            st.error(
+                f'Extractive summary resulted in an error with code "{summary_result.code}" and message "{summary_result.message}"'
+            )
+            return ""
+
+        abstractive_summary = " ".join(
+            [sentence.text for sentence in summary_result.summaries]
+        )
+
+    # Return the summary as a JSON object in the shape '{"call-summary":extractive_summary}'
+    return json.loads('{"call-summary":"' + abstractive_summary + '"}')
 
 
 @st.cache_data
@@ -182,7 +232,25 @@ def generate_query_based_summary(call_contents):
     # Join them together with spaces to pass in as a single document.
     joined_call_contents = " ".join(call_contents)
 
-    return "This is a placeholder result. Fill in with real query-based summary."
+    system = """
+        You are an automated analysis system for Contoso Suites.
+        Contoso Suites is a luxury hotel and resort chain with locations
+        in a variety of Caribbean nations and territories.
+
+        You are analyzing a call to generate a summary.
+
+        Please provide a short (maximum five words) summary of the transcript and label it "call-title".
+
+        Then, provide a two sentence summary of the transcript and label it "call-summary".
+
+        Return the results in JSON format.
+    """
+
+    return (
+        make_azure_openai_chat_request(system, joined_call_contents)
+        .choices[0]
+        .message.content
+    )
 
 
 @st.cache_data
@@ -198,7 +266,70 @@ def create_sentiment_analysis_and_opinion_mining_request(call_contents):
     # Join them together with spaces to pass in as a single document.
     joined_call_contents = " ".join(call_contents)
 
-    return "This is a placeholder result. Fill in with real sentiment analysis."
+    text_analytics_client = TextAnalyticsClient(
+        endpoint=language_endpoint,
+        credential=AzureKeyCredential(language_key),
+    )
+
+    result = text_analytics_client.analyze_sentiment(
+        [joined_call_contents], show_opinion_mining=True
+    )
+
+    # Retrieve all document results that are not an error.
+    doc_result = [doc for doc in result if not doc.is_error]
+
+    sentiment = {}
+
+    # Assign the correct values to the JSON object.
+    for document in doc_result:
+        sentiment["sentiment"] = document.sentiment
+        sentiment["sentiment-scores"] = {
+            "positive": document.confidence_scores.positive,
+            "neutral": document.confidence_scores.neutral,
+            "negative": document.confidence_scores.negative,
+        }
+
+        sentences = []
+        for s in document.sentences:
+            sentence = {}
+            sentence["text"] = s.text
+            sentence["sentiment"] = s.sentiment
+            sentence["sentiment-scores"] = {
+                "positive": s.confidence_scores.positive,
+                "neutral": s.confidence_scores.neutral,
+                "negative": s.confidence_scores.negative,
+            }
+
+            mined_opinions = []
+            for mined_opinion in s.mined_opinions:
+                opinion = {}
+                opinion["target-text"] = mined_opinion.target.text
+                opinion["target-sentiment"] = mined_opinion.target.sentiment
+                opinion["sentiment-scores"] = {
+                    "positive": mined_opinion.target.confidence_scores.positive,
+                    "negative": mined_opinion.target.confidence_scores.negative,
+                }
+
+                opinion_assessments = []
+                for assessment in mined_opinion.assessments:
+                    opinion_assessment = {}
+                    opinion_assessment["text"] = assessment.text
+                    opinion_assessment["sentiment"] = assessment.sentiment
+                    opinion_assessment["sentiment-scores"] = {
+                        "positive": assessment.confidence_scores.positive,
+                        "negative": assessment.confidence_scores.negative,
+                    }
+                    opinion_assessments.append(opinion_assessment)
+
+                opinion["assessments"] = opinion_assessments
+                mined_opinions.append(opinion)
+
+            sentence["mined_opinions"] = mined_opinions
+            sentences.append(sentence)
+
+        sentiment["sentences"] = sentences
+
+    return sentiment
 
 
 def make_azure_openai_embedding_request(text):
